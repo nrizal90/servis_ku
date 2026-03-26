@@ -21,6 +21,11 @@ class ServiceRecordNotifier extends AsyncNotifier<List<ServiceRecord>> {
     return saved;
   }
 
+  Future<void> updateRecord(ServiceRecord record) async {
+    await DatabaseHelper.instance.updateServiceRecord(record);
+    await reload();
+  }
+
   Future<void> deleteRecord(int id) async {
     await DatabaseHelper.instance.deleteServiceRecord(id);
     await reload();

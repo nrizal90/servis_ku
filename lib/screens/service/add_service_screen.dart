@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 import 'package:servisku/config/theme.dart';
 import 'package:servisku/database/database_helper.dart';
 import 'package:servisku/models/service_record.dart';
+import 'package:servisku/models/service_type.dart';
 import 'package:servisku/models/vehicle.dart';
 import 'package:servisku/providers/service_record_provider.dart';
 import 'package:servisku/screens/service/widgets/service_type_selector.dart';
+import 'package:servisku/services/notification_service.dart';
 import 'package:servisku/utils/format_utils.dart';
 import 'package:servisku/widgets/app_button.dart';
 import 'package:servisku/widgets/app_input.dart';
@@ -15,7 +17,13 @@ import 'package:servisku/widgets/toast.dart';
 
 class AddServiceScreen extends ConsumerStatefulWidget {
   final int vehicleId;
-  const AddServiceScreen({super.key, required this.vehicleId});
+  final ServiceRecord? existingRecord;
+
+  const AddServiceScreen({
+    super.key,
+    required this.vehicleId,
+    this.existingRecord,
+  });
 
   @override
   ConsumerState<AddServiceScreen> createState() => _AddServiceScreenState();
@@ -28,13 +36,23 @@ class _AddServiceScreenState extends ConsumerState<AddServiceScreen> {
   final _notesCtrl = TextEditingController();
 
   Vehicle? _vehicle;
-  String? _selectedTypeId;
-  DateTime _date = DateTime.now();
+  late String? _selectedTypeId;
+  late DateTime _date;
   bool _saving = false;
+
+  bool get _isEdit => widget.existingRecord != null;
 
   @override
   void initState() {
     super.initState();
+    final r = widget.existingRecord;
+    _selectedTypeId = r?.serviceType;
+    _date = r?.date ?? DateTime.now();
+    _kmCtrl.text = r?.km?.toString() ?? '';
+    _costCtrl.text = r?.cost?.toString() ?? '';
+    _bengkelCtrl.text = r?.bengkel ?? '';
+    _notesCtrl.text = r?.notes ?? '';
+
     DatabaseHelper.instance
         .getVehicleById(widget.vehicleId)
         .then((v) => setState(() => _vehicle = v));
@@ -66,22 +84,58 @@ class _AddServiceScreenState extends ConsumerState<AddServiceScreen> {
     }
     setState(() => _saving = true);
 
-    final record = ServiceRecord(
-      vehicleId: widget.vehicleId,
-      serviceType: _selectedTypeId!,
-      date: _date,
-      km: _kmCtrl.text.isNotEmpty ? int.tryParse(_kmCtrl.text) : null,
-      cost: _costCtrl.text.isNotEmpty ? int.tryParse(_costCtrl.text) : null,
-      bengkel:
-          _bengkelCtrl.text.trim().isNotEmpty ? _bengkelCtrl.text.trim() : null,
-      notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
-      createdAt: DateTime.now(),
-    );
-
     try {
-      await ref.read(serviceRecordProvider.notifier).addRecord(record);
+      ServiceRecord saved;
+
+      if (_isEdit) {
+        final updated = widget.existingRecord!.copyWith(
+          serviceType: _selectedTypeId,
+          date: _date,
+          km: _kmCtrl.text.isNotEmpty ? int.tryParse(_kmCtrl.text) : null,
+          cost: _costCtrl.text.isNotEmpty ? int.tryParse(_costCtrl.text) : null,
+          bengkel: _bengkelCtrl.text.trim().isNotEmpty
+              ? _bengkelCtrl.text.trim()
+              : null,
+          notes: _notesCtrl.text.trim().isNotEmpty
+              ? _notesCtrl.text.trim()
+              : null,
+        );
+        await ref.read(serviceRecordProvider.notifier).updateRecord(updated);
+        saved = updated;
+      } else {
+        final record = ServiceRecord(
+          vehicleId: widget.vehicleId,
+          serviceType: _selectedTypeId!,
+          date: _date,
+          km: _kmCtrl.text.isNotEmpty ? int.tryParse(_kmCtrl.text) : null,
+          cost: _costCtrl.text.isNotEmpty ? int.tryParse(_costCtrl.text) : null,
+          bengkel: _bengkelCtrl.text.trim().isNotEmpty
+              ? _bengkelCtrl.text.trim()
+              : null,
+          notes: _notesCtrl.text.trim().isNotEmpty
+              ? _notesCtrl.text.trim()
+              : null,
+          createdAt: DateTime.now(),
+        );
+        saved = await ref.read(serviceRecordProvider.notifier).addRecord(record);
+      }
+
+      // Reschedule notifikasi untuk service type ini
+      if (_vehicle != null) {
+        final st = defaultServiceTypes
+            .where((s) => s.id == saved.serviceType)
+            .firstOrNull;
+        if (st != null && st.intervalDays != null) {
+          await NotificationService.instance
+              .cancelServiceReminders(_vehicle!, st);
+          await NotificationService.instance
+              .scheduleServiceReminders(_vehicle!, st, saved);
+        }
+      }
+
       if (mounted) {
-        showToast(context, 'Service berhasil dicatat!');
+        showToast(context,
+            _isEdit ? 'Service berhasil diupdate!' : 'Service berhasil dicatat!');
         context.pop();
       }
     } catch (e) {
@@ -98,7 +152,8 @@ class _AddServiceScreenState extends ConsumerState<AddServiceScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Catat Service')),
+      appBar: AppBar(
+          title: Text(_isEdit ? 'Edit Service' : 'Catat Service')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -107,7 +162,8 @@ class _AddServiceScreenState extends ConsumerState<AddServiceScreen> {
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+              border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.15)),
             ),
             child: Row(
               children: [
@@ -151,7 +207,8 @@ class _AddServiceScreenState extends ConsumerState<AddServiceScreen> {
           GestureDetector(
             onTap: _pickDate,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
@@ -223,7 +280,7 @@ class _AddServiceScreenState extends ConsumerState<AddServiceScreen> {
           ),
           const SizedBox(height: 30),
           AppButton(
-            label: 'Simpan',
+            label: _isEdit ? 'Update' : 'Simpan',
             onPressed: _save,
             isLoading: _saving,
           ),

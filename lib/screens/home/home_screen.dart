@@ -18,11 +18,21 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   VehicleType? _selectedType;
+  String _searchQuery = '';
 
   @override
   Widget build(BuildContext context) {
     final vehiclesAsync = ref.watch(filteredVehicleProvider(_selectedType));
     final alertsAsync = ref.watch(alertsProvider);
+
+    // Apply search filter
+    final filteredAsync = vehiclesAsync.whenData((list) => _searchQuery.isEmpty
+        ? list
+        : list.where((v) {
+            final q = _searchQuery.toLowerCase();
+            return v.name.toLowerCase().contains(q) ||
+                v.plate.toLowerCase().contains(q);
+          }).toList());
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -48,7 +58,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: _buildFilterTabs(),
+                child: Column(
+                  children: [
+                    TextField(
+                      onChanged: (v) => setState(() => _searchQuery = v),
+                      decoration: InputDecoration(
+                        hintText: 'Cari kendaraan...',
+                        prefixIcon: const Icon(Icons.search_rounded,
+                            color: AppColors.textHint),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.close_rounded,
+                                    size: 18, color: AppColors.textHint),
+                                onPressed: () =>
+                                    setState(() => _searchQuery = ''),
+                              )
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildFilterTabs(),
+                  ],
+                ),
               ),
             ),
             alertsAsync.when(
@@ -87,7 +118,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-              sliver: vehiclesAsync.when(
+              sliver: filteredAsync.when(
                 loading: () => const SliverToBoxAdapter(
                   child: Center(child: CircularProgressIndicator()),
                 ),

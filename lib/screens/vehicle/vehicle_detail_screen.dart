@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:servisku/config/theme.dart';
 import 'package:servisku/database/database_helper.dart';
+import 'package:servisku/models/service_record.dart';
+import 'package:servisku/models/service_type.dart';
 import 'package:servisku/models/vehicle.dart';
 import 'package:servisku/providers/service_record_provider.dart';
 import 'package:servisku/providers/vehicle_provider.dart';
 import 'package:servisku/screens/vehicle/widgets/history_list.dart';
 import 'package:servisku/screens/vehicle/widgets/service_status_grid.dart';
+import 'package:servisku/services/notification_service.dart';
 import 'package:servisku/utils/format_utils.dart';
 import 'package:servisku/utils/service_calculator.dart';
 import 'package:servisku/widgets/confirm_dialog.dart';
@@ -36,20 +39,35 @@ class VehicleDetailScreen extends ConsumerWidget {
   }
 }
 
-class _DetailView extends ConsumerWidget {
+class _DetailView extends ConsumerStatefulWidget {
   final Vehicle vehicle;
-  final AsyncValue recordsAsync;
+  final AsyncValue<List<ServiceRecord>> recordsAsync;
 
   const _DetailView({required this.vehicle, required this.recordsAsync});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_DetailView> createState() => _DetailViewState();
+}
+
+class _DetailViewState extends ConsumerState<_DetailView> {
+  String? _filterTypeId;
+
+  @override
+  Widget build(BuildContext context) {
+    final vehicle = widget.vehicle;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(vehicle.name),
         actions: [
           IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Edit kendaraan',
+            onPressed: () => context.push('/edit-vehicle', extra: vehicle),
+          ),
+          IconButton(
             icon: const Icon(Icons.delete_outline_rounded),
+            tooltip: 'Hapus kendaraan',
             onPressed: () async {
               final ok = await showConfirmDialog(
                 context,
@@ -67,80 +85,97 @@ class _DetailView extends ConsumerWidget {
           ),
         ],
       ),
-      body: recordsAsync.when(
+      body: widget.recordsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
-        data: (records) => CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _VehicleBanner(vehicle: vehicle),
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _AdminSection(vehicle: vehicle, ref: ref),
-                        const SizedBox(height: 20),
-                        const Text(
-                          'Status Service',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ServiceStatusGrid(vehicle: vehicle, records: records),
-                        const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Riwayat Service',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
+        data: (records) {
+          final filtered = _filterTypeId == null
+              ? records
+              : records.where((r) => r.serviceType == _filterTypeId).toList();
+
+          return CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _VehicleBanner(vehicle: vehicle),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _AdminSection(vehicle: vehicle, ref: ref),
+                          const SizedBox(height: 16),
+                          if (records.isNotEmpty) ...[
+                            _StatsSection(records: records),
+                            const SizedBox(height: 20),
+                          ],
+                          const Text(
+                            'Status Service',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
                             ),
-                            if (records.isNotEmpty)
-                              Text(
-                                'Total: ${formatCurrency(records.fold(0, (s, r) => s + (r.cost ?? 0)))}',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(height: 12),
+                          ServiceStatusGrid(
+                              vehicle: vehicle, records: records),
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Riwayat Service',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        HistoryList(
-                          records: records,
-                          onDelete: (r) async {
-                            final ok = await showConfirmDialog(
-                              context,
-                              title: 'Hapus Record',
-                              message: 'Hapus catatan service ini?',
-                            );
-                            if (ok) {
-                              await ref
-                                  .read(serviceRecordProvider.notifier)
-                                  .deleteRecord(r.id!);
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 100),
-                      ],
+                              if (records.isNotEmpty)
+                                _FilterDropdown(
+                                  vehicleType: vehicle.vehicleType,
+                                  selectedId: _filterTypeId,
+                                  onChanged: (id) =>
+                                      setState(() => _filterTypeId = id),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          HistoryList(
+                            records: filtered,
+                            onEdit: (r) => context.push(
+                              '/vehicle/${vehicle.id}/service/edit',
+                              extra: r,
+                            ),
+                            onDelete: (r) async {
+                              final ok = await showConfirmDialog(
+                                context,
+                                title: 'Hapus Record',
+                                message: 'Hapus catatan service ini?',
+                              );
+                              if (ok && context.mounted) {
+                                await ref
+                                    .read(serviceRecordProvider.notifier)
+                                    .deleteRecord(r.id!);
+                                if (context.mounted) {
+                                  showToast(context, 'Record dihapus');
+                                }
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 100),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/vehicle/${vehicle.id}/service'),
@@ -152,6 +187,150 @@ class _DetailView extends ConsumerWidget {
     );
   }
 }
+
+// ─── Stats Section ────────────────────────────────────────────────────────────
+
+class _StatsSection extends StatelessWidget {
+  final List<ServiceRecord> records;
+
+  const _StatsSection({required this.records});
+
+  @override
+  Widget build(BuildContext context) {
+    final totalCost = records.fold(0, (s, r) => s + (r.cost ?? 0));
+    final lastRecord = records.isNotEmpty ? records.first : null;
+    final lastKm = records
+        .where((r) => r.km != null)
+        .fold<int?>(null, (prev, r) => (prev == null || r.km! > prev) ? r.km : prev);
+
+    // Avg per bulan
+    int avgPerMonth = 0;
+    if (records.length > 1) {
+      final oldest = records.last.date;
+      final newest = records.first.date;
+      final months = newest.difference(oldest).inDays / 30;
+      if (months > 0) avgPerMonth = (totalCost / months).round();
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Ringkasan',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _StatItem(
+                    label: 'Total Service',
+                    value: '${records.length}x'),
+                _StatItem(
+                    label: 'Total Biaya',
+                    value: formatCurrency(totalCost)),
+                _StatItem(
+                    label: 'Avg/bulan',
+                    value: avgPerMonth > 0
+                        ? formatCurrency(avgPerMonth)
+                        : '-'),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              children: [
+                _StatItem(
+                  label: 'Service Terakhir',
+                  value: lastRecord != null
+                      ? formatDate(lastRecord.date)
+                      : '-',
+                ),
+                _StatItem(
+                  label: 'Km Terakhir',
+                  value: lastKm != null ? formatKm(lastKm) : '-',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatItem extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _StatItem({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 11, color: AppColors.textSecondary)),
+          const SizedBox(height: 2),
+          Text(value,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Filter Dropdown ──────────────────────────────────────────────────────────
+
+class _FilterDropdown extends StatelessWidget {
+  final VehicleType vehicleType;
+  final String? selectedId;
+  final ValueChanged<String?> onChanged;
+
+  const _FilterDropdown({
+    required this.vehicleType,
+    required this.selectedId,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final types = getServiceTypesFor(vehicleType);
+    return DropdownButton<String?>(
+      value: selectedId,
+      hint: const Text('Semua',
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+      underline: const SizedBox.shrink(),
+      isDense: true,
+      items: [
+        const DropdownMenuItem<String?>(
+          value: null,
+          child: Text('Semua', style: TextStyle(fontSize: 12)),
+        ),
+        ...types.map((st) => DropdownMenuItem<String?>(
+              value: st.id,
+              child: Text('${st.icon} ${st.label}',
+                  style: const TextStyle(fontSize: 12)),
+            )),
+      ],
+      onChanged: onChanged,
+    );
+  }
+}
+
+// ─── Vehicle Banner ───────────────────────────────────────────────────────────
 
 class _VehicleBanner extends StatelessWidget {
   final Vehicle vehicle;
@@ -192,10 +371,7 @@ class _VehicleBanner extends StatelessWidget {
                     vehicle.typeLabel,
                     if (vehicle.year != null) '${vehicle.year}',
                   ].join(' · '),
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                  ),
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
                 ),
               ],
             ),
@@ -205,6 +381,8 @@ class _VehicleBanner extends StatelessWidget {
     );
   }
 }
+
+// ─── Admin Section ────────────────────────────────────────────────────────────
 
 class _AdminSection extends StatelessWidget {
   final Vehicle vehicle;
@@ -243,10 +421,13 @@ class _AdminSection extends StatelessWidget {
                     ? DateTime(vehicle.stnkDueDate!.year + 1,
                         vehicle.stnkDueDate!.month, vehicle.stnkDueDate!.day)
                     : DateTime.now().add(const Duration(days: 365));
-                await ref.read(vehicleProvider.notifier).updateVehicle(
-                    vehicle.copyWith(stnkDueDate: newDate));
+                final updated = vehicle.copyWith(stnkDueDate: newDate);
+                await ref.read(vehicleProvider.notifier).updateVehicle(updated);
+                await NotificationService.instance.cancelStnkReminders(vehicle);
+                await NotificationService.instance.scheduleStnkReminders(updated);
                 if (context.mounted) {
-                  showToast(context, 'Tanggal STNK diperbarui');
+                  showToast(context,
+                      'STNK diperbarui! Jatuh tempo: ${formatDate(newDate)}');
                 }
               },
             ),
@@ -262,10 +443,13 @@ class _AdminSection extends StatelessWidget {
                     ? DateTime(vehicle.platDueDate!.year + 5,
                         vehicle.platDueDate!.month, vehicle.platDueDate!.day)
                     : DateTime.now().add(const Duration(days: 365 * 5));
-                await ref.read(vehicleProvider.notifier).updateVehicle(
-                    vehicle.copyWith(platDueDate: newDate));
+                final updated = vehicle.copyWith(platDueDate: newDate);
+                await ref.read(vehicleProvider.notifier).updateVehicle(updated);
+                await NotificationService.instance.cancelPlatReminders(vehicle);
+                await NotificationService.instance.schedulePlatReminders(updated);
                 if (context.mounted) {
-                  showToast(context, 'Tanggal ganti plat diperbarui');
+                  showToast(context,
+                      'Plat diperbarui! Jatuh tempo: ${formatDate(newDate)}');
                 }
               },
             ),
@@ -335,8 +519,7 @@ class _AdminRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: _statusColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(6),

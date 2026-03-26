@@ -11,7 +11,8 @@ import 'package:servisku/widgets/app_input.dart';
 import 'package:servisku/widgets/toast.dart';
 
 class AddVehicleScreen extends ConsumerStatefulWidget {
-  const AddVehicleScreen({super.key});
+  final Vehicle? existingVehicle;
+  const AddVehicleScreen({super.key, this.existingVehicle});
 
   @override
   ConsumerState<AddVehicleScreen> createState() => _AddVehicleScreenState();
@@ -24,10 +25,25 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
   final _yearCtrl = TextEditingController();
   final _brandCtrl = TextEditingController();
 
-  VehicleType _selectedType = VehicleType.motor;
+  late VehicleType _selectedType;
   DateTime? _stnkDueDate;
   DateTime? _platDueDate;
   bool _saving = false;
+
+  bool get _isEdit => widget.existingVehicle != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final v = widget.existingVehicle;
+    _selectedType = v?.vehicleType ?? VehicleType.motor;
+    _nameCtrl.text = v?.name ?? '';
+    _plateCtrl.text = v?.plate ?? '';
+    _yearCtrl.text = v?.year?.toString() ?? '';
+    _brandCtrl.text = v?.brand ?? '';
+    _stnkDueDate = v?.stnkDueDate;
+    _platDueDate = v?.platDueDate;
+  }
 
   @override
   void dispose() {
@@ -68,23 +84,38 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
 
-    final vehicle = Vehicle(
-      vehicleType: _selectedType,
-      name: _nameCtrl.text.trim(),
-      plate: _plateCtrl.text.trim().toUpperCase(),
-      year: _yearCtrl.text.isNotEmpty ? int.tryParse(_yearCtrl.text) : null,
-      brand: _brandCtrl.text.trim().isNotEmpty ? _brandCtrl.text.trim() : null,
-      stnkDueDate: _stnkDueDate,
-      platDueDate: _platDueDate,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-
     try {
-      await ref.read(vehicleProvider.notifier).addVehicle(vehicle);
-      if (mounted) {
-        showToast(context, 'Kendaraan berhasil ditambahkan!');
-        context.pop();
+      if (_isEdit) {
+        final updated = widget.existingVehicle!.copyWith(
+          name: _nameCtrl.text.trim(),
+          plate: _plateCtrl.text.trim().toUpperCase(),
+          year: _yearCtrl.text.isNotEmpty ? int.tryParse(_yearCtrl.text) : null,
+          brand: _brandCtrl.text.trim().isNotEmpty ? _brandCtrl.text.trim() : null,
+          stnkDueDate: _stnkDueDate,
+          platDueDate: _platDueDate,
+        );
+        await ref.read(vehicleProvider.notifier).updateVehicle(updated);
+        if (mounted) {
+          showToast(context, 'Kendaraan berhasil diupdate!');
+          context.pop();
+        }
+      } else {
+        final vehicle = Vehicle(
+          vehicleType: _selectedType,
+          name: _nameCtrl.text.trim(),
+          plate: _plateCtrl.text.trim().toUpperCase(),
+          year: _yearCtrl.text.isNotEmpty ? int.tryParse(_yearCtrl.text) : null,
+          brand: _brandCtrl.text.trim().isNotEmpty ? _brandCtrl.text.trim() : null,
+          stnkDueDate: _stnkDueDate,
+          platDueDate: _platDueDate,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+        await ref.read(vehicleProvider.notifier).addVehicle(vehicle);
+        if (mounted) {
+          showToast(context, 'Kendaraan berhasil ditambahkan!');
+          context.pop();
+        }
       }
     } catch (e) {
       if (mounted) showToast(context, 'Gagal menyimpan: $e', isError: true);
@@ -96,7 +127,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tambah Kendaraan')),
+      appBar: AppBar(title: Text(_isEdit ? 'Edit Kendaraan' : 'Tambah Kendaraan')),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -116,19 +147,25 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                   icon: '🏍️',
                   label: 'Motor',
                   selected: _selectedType == VehicleType.motor,
-                  onTap: () =>
-                      setState(() => _selectedType = VehicleType.motor),
+                  onTap: _isEdit ? null : () => setState(() => _selectedType = VehicleType.motor),
                 ),
                 const SizedBox(width: 12),
                 _TypeButton(
                   icon: '🚗',
                   label: 'Mobil',
                   selected: _selectedType == VehicleType.car,
-                  onTap: () =>
-                      setState(() => _selectedType = VehicleType.car),
+                  onTap: _isEdit ? null : () => setState(() => _selectedType = VehicleType.car),
                 ),
               ],
             ),
+            if (_isEdit)
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text(
+                  'Jenis kendaraan tidak dapat diubah',
+                  style: TextStyle(fontSize: 11, color: AppColors.textHint),
+                ),
+              ),
             const SizedBox(height: 20),
             AppInput(
               label: 'Nama Kendaraan *',
@@ -211,7 +248,7 @@ class _TypeButton extends StatelessWidget {
   final String icon;
   final String label;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _TypeButton({
     required this.icon,
@@ -223,14 +260,14 @@ class _TypeButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
+      child: Opacity(
+        opacity: onTap == null ? 0.5 : 1.0,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
           padding: const EdgeInsets.symmetric(vertical: 18),
           decoration: BoxDecoration(
-            color: selected
-                ? AppColors.primary
-                : Colors.white,
+            color: selected ? AppColors.primary : Colors.white,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selected ? AppColors.primary : AppColors.border,
@@ -251,6 +288,7 @@ class _TypeButton extends StatelessWidget {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

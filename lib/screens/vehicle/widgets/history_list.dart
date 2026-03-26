@@ -7,8 +7,9 @@ import 'package:servisku/utils/format_utils.dart';
 class HistoryList extends StatelessWidget {
   final List<ServiceRecord> records;
   final void Function(ServiceRecord)? onDelete;
+  final void Function(ServiceRecord)? onEdit;
 
-  const HistoryList({super.key, required this.records, this.onDelete});
+  const HistoryList({super.key, required this.records, this.onDelete, this.onEdit});
 
   String _icon(String serviceTypeId) {
     try {
@@ -87,6 +88,14 @@ class HistoryList extends StatelessWidget {
                     color: AppColors.textPrimary,
                   ),
                 ),
+              if (onEdit != null) ...[
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined,
+                      size: 16, color: AppColors.textHint),
+                  onPressed: () => onEdit!(r),
+                ),
+              ],
               if (onDelete != null) ...[
                 const SizedBox(width: 4),
                 IconButton(

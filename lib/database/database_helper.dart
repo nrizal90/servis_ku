@@ -74,7 +74,14 @@ class DatabaseHelper {
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
-    // Migrasi akan ditambahkan di phase berikutnya
+    if (oldVersion < 2) {
+      try {
+        await db.execute(
+            'ALTER TABLE service_records ADD COLUMN bengkel TEXT');
+      } catch (_) {
+        // Kolom sudah ada dari phase 1
+      }
+    }
   }
 
   // ─── Vehicle CRUD ──────────────────────────────────────────────────────────
@@ -176,6 +183,16 @@ class DatabaseHelper {
       [vehicleId],
     );
     return (result.first['total'] as int?) ?? 0;
+  }
+
+  Future<void> updateServiceRecord(ServiceRecord record) async {
+    final db = await database;
+    await db.update(
+      'service_records',
+      record.toMap(),
+      where: 'id = ?',
+      whereArgs: [record.id],
+    );
   }
 
   Future<void> deleteServiceRecord(int id) async {
