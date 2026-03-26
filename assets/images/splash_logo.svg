@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logo untuk splash screen.
+  Latar: warna #1E3A5F (diatur di flutter_native_splash.yaml).
+  File ini (putih, transparan) untuk di-convert ke PNG sebelum generate splash.
+-->
+<svg width="400" height="400" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Wrench handle -->
+  <rect x="8" y="43" width="84" height="14" rx="7"
+        fill="white" transform="rotate(-45 50 50)"/>
+
+  <!-- Ring end -->
+  <circle cx="78" cy="22" r="19" fill="white"/>
+  <!-- Hole – transparent -->
+  <circle cx="78" cy="22" r="10" fill="none"/>
+
+  <!-- Accent dot -->
+  <circle cx="22" cy="78" r="7" fill="white" opacity="0.35"/>
+</svg>

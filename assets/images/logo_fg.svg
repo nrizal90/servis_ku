@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Foreground layer untuk Adaptive Icon (Android 8.0+).
+  Background warna #1E3A5F diatur di flutter_launcher_icons.yaml.
+  Konten harus berada di dalam safe zone (tengah 66% area).
+-->
+<svg width="1024" height="1024" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Wrench handle -->
+  <rect x="8" y="43" width="84" height="14" rx="7"
+        fill="white" transform="rotate(-45 50 50)"/>
+
+  <!-- Ring end – top-right -->
+  <circle cx="78" cy="22" r="19" fill="white"/>
+  <!-- Hole in ring – transparent to show bg color -->
+  <circle cx="78" cy="22" r="10" fill="none"/>
+
+  <!-- Accent dot – bottom-left -->
+  <circle cx="22" cy="78" r="7" fill="white" opacity="0.35"/>
+</svg>

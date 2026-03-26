@@ -1,0 +1,20 @@
+flutter_native_splash:
+  # Warna background splash screen
+  color: "#1E3A5F"
+  color_dark: "#1E3A5F"
+
+  # Logo putih di tengah (konversi splash_logo.svg → splash_logo.png dulu)
+  image: assets/images/splash_logo.png
+  image_dark: assets/images/splash_logo.png
+
+  # Android 12+ splash screen (gunakan icon app otomatis)
+  android_12:
+    color: "#1E3A5F"
+    icon_background_color: "#1E3A5F"
+    image: assets/images/splash_logo.png
+
+  # Ukuran logo di splash
+  android_gravity: center
+  ios_content_mode: center
+  fullscreen: false
+  web: false
