@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:servisku/config/theme.dart';
 
 class AppButton extends StatelessWidget {
   final String label;
@@ -20,42 +21,60 @@ class AppButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final child = isLoading
-        ? const SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-          )
-        : Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 18),
-                const SizedBox(width: 8),
-              ],
-              Text(label),
-            ],
-          );
-
     if (outlined) {
       return OutlinedButton(
         onPressed: isLoading ? null : onPressed,
         style: OutlinedButton.styleFrom(
-          side: BorderSide(color: color ?? Theme.of(context).colorScheme.primary),
-          foregroundColor: color ?? Theme.of(context).colorScheme.primary,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+          side: BorderSide(
+              color: color ?? AppColors.primary, width: 1.5),
+          foregroundColor: color ?? AppColors.primary,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14)),
+          padding:
+              const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
         ),
-        child: child,
+        child: _child,
       );
     }
 
-    return ElevatedButton(
-      onPressed: isLoading ? null : onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: color == null ? AppColors.gradientPrimary : null,
+        color: color,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: onPressed != null ? AppShadows.button : [],
       ),
-      child: child,
+      child: ElevatedButton(
+        onPressed: isLoading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14)),
+          padding: const EdgeInsets.symmetric(vertical: 15),
+        ),
+        child: _child,
+      ),
     );
   }
+
+  Widget get _child => isLoading
+      ? const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+              strokeWidth: 2, color: Colors.white),
+        )
+      : Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 18),
+              const SizedBox(width: 8),
+            ],
+            Text(label),
+          ],
+        );
 }

@@ -25,7 +25,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final vehiclesAsync = ref.watch(filteredVehicleProvider(_selectedType));
     final alertsAsync = ref.watch(alertsProvider);
 
-    // Apply search filter
     final filteredAsync = vehiclesAsync.whenData((list) => _searchQuery.isEmpty
         ? list
         : list.where((v) {
@@ -34,20 +33,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 v.plate.toLowerCase().contains(q);
           }).toList());
 
+    final totalVehicles = vehiclesAsync.valueOrNull?.length ?? 0;
+    final totalAlerts = alertsAsync.valueOrNull?.length ?? 0;
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('ServisKu'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () {
-              ref.invalidate(vehicleProvider);
-              ref.invalidate(serviceRecordProvider);
-            },
-          ),
-        ],
-      ),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(vehicleProvider);
@@ -55,35 +45,109 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         },
         child: CustomScrollView(
           slivers: [
+            // ── Gradient Header ──────────────────────────────────────────
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: AppColors.gradientPrimary,
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(28),
+                    bottomRight: Radius.circular(28),
+                  ),
+                ),
+                padding: EdgeInsets.only(
+                  top: MediaQuery.of(context).padding.top + 16,
+                  left: 20,
+                  right: 20,
+                  bottom: 24,
+                ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextField(
-                      onChanged: (v) => setState(() => _searchQuery = v),
-                      decoration: InputDecoration(
-                        hintText: 'Cari kendaraan...',
-                        prefixIcon: const Icon(Icons.search_rounded,
-                            color: AppColors.textHint),
-                        suffixIcon: _searchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.close_rounded,
-                                    size: 18, color: AppColors.textHint),
-                                onPressed: () =>
-                                    setState(() => _searchQuery = ''),
-                              )
-                            : null,
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'ServisKu 🔧',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            ref.invalidate(vehicleProvider);
+                            ref.invalidate(serviceRecordProvider);
+                          },
+                          icon: const Icon(Icons.refresh_rounded,
+                              color: Colors.white70, size: 20),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$totalVehicles kendaraan terdaftar'
+                      '${totalAlerts > 0 ? ' · $totalAlerts perlu perhatian' : ''}',
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 13,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    _buildFilterTabs(),
+                    const SizedBox(height: 18),
+                    // Search bar
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: TextField(
+                        onChanged: (v) => setState(() => _searchQuery = v),
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: 'Cari nama atau plat nomor…',
+                          hintStyle: const TextStyle(
+                              color: Colors.white54, fontSize: 14),
+                          prefixIcon: const Icon(Icons.search_rounded,
+                              color: Colors.white54, size: 20),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.close_rounded,
+                                      color: Colors.white54, size: 18),
+                                  onPressed: () =>
+                                      setState(() => _searchQuery = ''),
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
+                          fillColor: Colors.transparent,
+                          filled: false,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
+
+            // ── Filter Tabs ───────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: _buildFilterTabs(),
+              ),
+            ),
+
+            // ── Alert Section ────────────────────────────────────────────
             alertsAsync.when(
-              loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+              loading: () =>
+                  const SliverToBoxAdapter(child: SizedBox.shrink()),
               error: (_, __) =>
                   const SliverToBoxAdapter(child: SizedBox.shrink()),
               data: (alerts) {
@@ -92,19 +156,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 }
                 return SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Perlu Perhatian',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
+                        Row(
+                          children: [
+                            Container(
+                              width: 4,
+                              height: 18,
+                              decoration: BoxDecoration(
+                                color: AppColors.warning,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Perlu Perhatian',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.warning,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '${alerts.length}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
                         ...alerts.map((a) => AlertCard(
                               alert: a,
                               onTap: () =>
@@ -116,11 +210,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 );
               },
             ),
+
+            // ── Vehicle List ─────────────────────────────────────────────
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
               sliver: filteredAsync.when(
                 loading: () => const SliverToBoxAdapter(
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(
+                      child: Padding(
+                    padding: EdgeInsets.all(40),
+                    child: CircularProgressIndicator(),
+                  )),
                 ),
                 error: (e, _) => SliverToBoxAdapter(
                   child: Center(child: Text('Error: $e')),
@@ -129,10 +229,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   if (vehicles.isEmpty) {
                     return SliverToBoxAdapter(
                       child: EmptyState(
-                        message:
-                            'Belum ada kendaraan.\nTambahkan kendaraan pertamamu!',
-                        actionLabel: '+ Tambah Kendaraan',
-                        onAction: () => context.push('/add-vehicle'),
+                        message: _searchQuery.isNotEmpty
+                            ? 'Kendaraan tidak ditemukan.'
+                            : 'Belum ada kendaraan.\nYuk tambah kendaraan pertamamu!',
+                        actionLabel:
+                            _searchQuery.isEmpty ? '+ Tambah Kendaraan' : null,
+                        onAction: _searchQuery.isEmpty
+                            ? () => context.push('/add-vehicle')
+                            : null,
                       ),
                     );
                   }
@@ -143,15 +247,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Kendaraan Kamu',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
-                                ),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 4,
+                                    height: 18,
+                                    decoration: BoxDecoration(
+                                      gradient: AppColors.gradientPrimary,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Kendaraan Kamu',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 12),
                               VehicleCard(
                                 vehicle: vehicles[0],
                                 onTap: () => context
@@ -175,12 +292,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/add-vehicle'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Tambah Kendaraan'),
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          gradient: AppColors.gradientPrimary,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: AppShadows.button,
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: () => context.push('/add-vehicle'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          icon: const Icon(Icons.add_rounded, color: Colors.white),
+          label: const Text('Tambah',
+              style: TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w600)),
+        ),
       ),
     );
   }
@@ -192,36 +318,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       (VehicleType.car, '🚗 Mobil'),
     ];
 
-    return Row(
-      children: tabs.map((tab) {
-        final selected = _selectedType == tab.$1;
-        return Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: GestureDetector(
-            onTap: () => setState(() => _selectedType = tab.$1),
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: selected ? AppColors.primary : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: selected ? AppColors.primary : AppColors.border,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: tabs.map((tab) {
+          final selected = _selectedType == tab.$1;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedType = tab.$1),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 18, vertical: 9),
+                decoration: BoxDecoration(
+                  gradient: selected ? AppColors.gradientPrimary : null,
+                  color: selected ? null : Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: selected ? AppShadows.button : AppShadows.card,
                 ),
-              ),
-              child: Text(
-                tab.$2,
-                style: TextStyle(
-                  color: selected ? Colors.white : AppColors.textSecondary,
-                  fontWeight:
-                      selected ? FontWeight.w600 : FontWeight.normal,
-                  fontSize: 13,
+                child: Text(
+                  tab.$2,
+                  style: TextStyle(
+                    color: selected ? Colors.white : AppColors.textSecondary,
+                    fontWeight:
+                        selected ? FontWeight.w700 : FontWeight.w500,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      }).toList(),
+          );
+        }).toList(),
+      ),
     );
   }
 }

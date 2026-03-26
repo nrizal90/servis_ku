@@ -177,12 +177,21 @@ class _DetailViewState extends ConsumerState<_DetailView> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/vehicle/${vehicle.id}/service'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Catat Service'),
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          gradient: AppColors.gradientPrimary,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: AppShadows.button,
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: () => context.push('/vehicle/${vehicle.id}/service'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          icon: const Icon(Icons.add_rounded, color: Colors.white),
+          label: const Text('Catat Service',
+              style: TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w600)),
+        ),
       ),
     );
   }
@@ -201,64 +210,61 @@ class _StatsSection extends StatelessWidget {
     final lastRecord = records.isNotEmpty ? records.first : null;
     final lastKm = records
         .where((r) => r.km != null)
-        .fold<int?>(null, (prev, r) => (prev == null || r.km! > prev) ? r.km : prev);
+        .fold<int?>(null,
+            (prev, r) => (prev == null || r.km! > prev) ? r.km : prev);
 
-    // Avg per bulan
     int avgPerMonth = 0;
     if (records.length > 1) {
-      final oldest = records.last.date;
-      final newest = records.first.date;
-      final months = newest.difference(oldest).inDays / 30;
+      final months =
+          records.first.date.difference(records.last.date).inDays / 30;
       if (months > 0) avgPerMonth = (totalCost / months).round();
     }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Ringkasan',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: AppColors.gradientPrimary,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: AppShadows.button,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Ringkasan',
+            style: TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+                fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _StatItem(label: 'Total Service', value: '${records.length}x'),
+              _StatItem(label: 'Total Biaya', value: formatCurrency(totalCost)),
+              _StatItem(
+                  label: 'Avg/bulan',
+                  value: avgPerMonth > 0 ? formatCurrency(avgPerMonth) : '-'),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+              height: 1,
+              color: Colors.white.withValues(alpha: 0.15)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _StatItem(
+                label: 'Servis Terakhir',
+                value: lastRecord != null ? formatDate(lastRecord.date) : '-',
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _StatItem(
-                    label: 'Total Service',
-                    value: '${records.length}x'),
-                _StatItem(
-                    label: 'Total Biaya',
-                    value: formatCurrency(totalCost)),
-                _StatItem(
-                    label: 'Avg/bulan',
-                    value: avgPerMonth > 0
-                        ? formatCurrency(avgPerMonth)
-                        : '-'),
-              ],
-            ),
-            const Divider(height: 20),
-            Row(
-              children: [
-                _StatItem(
-                  label: 'Service Terakhir',
-                  value: lastRecord != null
-                      ? formatDate(lastRecord.date)
-                      : '-',
-                ),
-                _StatItem(
-                  label: 'Km Terakhir',
-                  value: lastKm != null ? formatKm(lastKm) : '-',
-                ),
-              ],
-            ),
-          ],
-        ),
+              _StatItem(
+                label: 'Km Terakhir',
+                value: lastKm != null ? formatKm(lastKm) : '-',
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -278,13 +284,15 @@ class _StatItem extends StatelessWidget {
         children: [
           Text(label,
               style: const TextStyle(
-                  fontSize: 11, color: AppColors.textSecondary)),
-          const SizedBox(height: 2),
+                  fontSize: 11,
+                  color: Colors.white60,
+                  fontWeight: FontWeight.w500)),
+          const SizedBox(height: 3),
           Text(value,
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: Colors.white,
               )),
         ],
       ),
@@ -338,19 +346,35 @@ class _VehicleBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final gradient = vehicle.vehicleType == VehicleType.motor
+        ? AppColors.gradientMotor
+        : AppColors.gradientCar;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-      decoration: const BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
+      padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
         ),
       ),
       child: Row(
         children: [
-          Text(vehicle.icon, style: const TextStyle(fontSize: 48)),
+          // Large icon with soft white bg
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Center(
+              child: Text(vehicle.icon,
+                  style: const TextStyle(fontSize: 38)),
+            ),
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -360,18 +384,36 @@ class _VehicleBanner extends StatelessWidget {
                   vehicle.name,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    vehicle.plate,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   [
-                    vehicle.plate,
                     vehicle.typeLabel,
                     if (vehicle.year != null) '${vehicle.year}',
                   ].join(' · '),
-                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  style: const TextStyle(
+                      color: Colors.white70, fontSize: 12),
                 ),
               ],
             ),
@@ -395,9 +437,14 @@ class _AdminSection extends StatelessWidget {
     final stnkStatus = ServiceCalculator.getStnkStatus(vehicle.stnkDueDate);
     final platStatus = ServiceCalculator.getPlatStatus(vehicle.platDueDate);
 
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: AppShadows.card,
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

@@ -25,8 +25,8 @@ class ServiceStatusGrid extends StatelessWidget {
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         childAspectRatio: 1.0,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
       ),
       itemCount: types.length,
       itemBuilder: (ctx, i) {
@@ -59,28 +59,44 @@ class _ServiceCell extends StatelessWidget {
     return AppColors.success;
   }
 
+  Color get _bgColor {
+    if (status.isUnknown) return const Color(0xFFF1F5F9);
+    if (status.isOverdue) return AppColors.dangerLight;
+    if (status.isSoon) return AppColors.warningLight;
+    return AppColors.successLight;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: _color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _color.withValues(alpha: 0.3)),
+        color: _bgColor,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(serviceType.icon, style: const TextStyle(fontSize: 22)),
-          const SizedBox(height: 4),
+          Text(serviceType.icon, style: const TextStyle(fontSize: 24)),
+          const SizedBox(height: 5),
           Text(
             serviceType.label,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 10,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
               color: _color,
             ),
             maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: _color,
+              shape: BoxShape.circle,
+            ),
           ),
         ],
       ),

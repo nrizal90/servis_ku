@@ -10,19 +10,22 @@
   <!-- Background rounded square -->
   <rect width="100" height="100" rx="22" fill="url(#bg)"/>
 
-  <!-- Subtle inner glow ring -->
-  <rect x="3" y="3" width="94" height="94" rx="20"
-        fill="none" stroke="white" stroke-width="0.5" opacity="0.12"/>
+  <!-- Gear teeth: 8 buah, setiap 45° -->
+  <rect x="44.5" y="7" width="11" height="14" rx="3" fill="white" transform="rotate(0   50 50)"/>
+  <rect x="44.5" y="7" width="11" height="14" rx="3" fill="white" transform="rotate(45  50 50)"/>
+  <rect x="44.5" y="7" width="11" height="14" rx="3" fill="white" transform="rotate(90  50 50)"/>
+  <rect x="44.5" y="7" width="11" height="14" rx="3" fill="white" transform="rotate(135 50 50)"/>
+  <rect x="44.5" y="7" width="11" height="14" rx="3" fill="white" transform="rotate(180 50 50)"/>
+  <rect x="44.5" y="7" width="11" height="14" rx="3" fill="white" transform="rotate(225 50 50)"/>
+  <rect x="44.5" y="7" width="11" height="14" rx="3" fill="white" transform="rotate(270 50 50)"/>
+  <rect x="44.5" y="7" width="11" height="14" rx="3" fill="white" transform="rotate(315 50 50)"/>
 
-  <!-- Wrench handle (rotated rectangle) -->
-  <rect x="8" y="43" width="84" height="14" rx="7"
-        fill="white" transform="rotate(-45 50 50)"/>
+  <!-- Gear body circle (menutupi dasar gigi agar seamless) -->
+  <circle cx="50" cy="50" r="33" fill="white"/>
 
-  <!-- Ring end of wrench – top-right -->
-  <circle cx="78" cy="22" r="19" fill="white"/>
-  <!-- Hole in ring -->
-  <circle cx="78" cy="22" r="10" fill="#1C3660"/>
+  <!-- Lubang tengah gear -->
+  <circle cx="50" cy="50" r="13" fill="url(#bg)"/>
 
-  <!-- Accent dot – bottom-left handle end -->
-  <circle cx="22" cy="78" r="7" fill="white" opacity="0.35"/>
+  <!-- Titik kecil aksen di tengah -->
+  <circle cx="50" cy="50" r="4" fill="white" opacity="0.6"/>
 </svg>
