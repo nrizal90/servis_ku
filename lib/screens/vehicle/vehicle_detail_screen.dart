@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:servisku/config/theme.dart';
 import 'package:servisku/database/database_helper.dart';
+import 'package:servisku/models/fuel_record.dart';
 import 'package:servisku/models/service_record.dart';
 import 'package:servisku/models/service_type.dart';
 import 'package:servisku/models/vehicle.dart';
+import 'package:servisku/providers/fuel_record_provider.dart';
 import 'package:servisku/providers/service_record_provider.dart';
 import 'package:servisku/providers/vehicle_provider.dart';
 import 'package:servisku/screens/vehicle/widgets/history_list.dart';
@@ -92,6 +94,8 @@ class _DetailViewState extends ConsumerState<_DetailView> {
           final filtered = _filterTypeId == null
               ? records
               : records.where((r) => r.serviceType == _filterTypeId).toList();
+          final fuelAsync =
+              ref.watch(fuelRecordsByVehicleProvider(vehicle.id!));
 
           return CustomScrollView(
             slivers: [
@@ -166,6 +170,48 @@ class _DetailViewState extends ConsumerState<_DetailView> {
                               }
                             },
                           ),
+                          const SizedBox(height: 24),
+                          // ── Section BBM ──
+                          const Text(
+                            'Konsumsi BBM',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          fuelAsync.when(
+                            loading: () => const Center(
+                                child: CircularProgressIndicator()),
+                            error: (e, _) =>
+                                Text('Error: $e'),
+                            data: (fuelRecords) => _FuelSection(
+                              fuelRecords: fuelRecords,
+                              vehicle: vehicle,
+                              onEdit: (r) => context.push(
+                                '/vehicle/${vehicle.id}/fuel/edit',
+                                extra: r,
+                              ),
+                              onDelete: (r) async {
+                                final ok = await showConfirmDialog(
+                                  context,
+                                  title: 'Hapus Record BBM',
+                                  message: 'Hapus catatan isi BBM ini?',
+                                );
+                                if (ok && context.mounted) {
+                                  await ref
+                                      .read(fuelRecordProvider.notifier)
+                                      .deleteRecord(r.id!, vehicle.id!);
+                                  ref.invalidate(fuelRecordsByVehicleProvider(
+                                      vehicle.id!));
+                                  if (context.mounted) {
+                                    showToast(context, 'Record BBM dihapus');
+                                  }
+                                }
+                              },
+                            ),
+                          ),
                           const SizedBox(height: 100),
                         ],
                       ),
@@ -177,21 +223,25 @@ class _DetailViewState extends ConsumerState<_DetailView> {
           );
         },
       ),
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          gradient: AppColors.gradientPrimary,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: AppShadows.button,
-        ),
-        child: FloatingActionButton.extended(
-          onPressed: () => context.push('/vehicle/${vehicle.id}/service'),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          icon: const Icon(Icons.add_rounded, color: Colors.white),
-          label: const Text('Catat Service',
-              style: TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.w600)),
-        ),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          _FabButton(
+            icon: Icons.local_gas_station_rounded,
+            label: 'Catat BBM',
+            onPressed: () =>
+                context.push('/vehicle/${vehicle.id}/fuel'),
+          ),
+          const SizedBox(height: 10),
+          _FabButton(
+            icon: Icons.build_rounded,
+            label: 'Catat Service',
+            onPressed: () =>
+                context.push('/vehicle/${vehicle.id}/service'),
+            isPrimary: true,
+          ),
+        ],
       ),
     );
   }
@@ -502,6 +552,292 @@ class _AdminSection extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── FAB Button ───────────────────────────────────────────────────────────────
+
+class _FabButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+  final bool isPrimary;
+
+  const _FabButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.isPrimary = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isPrimary) {
+      return Container(
+        decoration: BoxDecoration(
+          gradient: AppColors.gradientPrimary,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: AppShadows.button,
+        ),
+        child: FloatingActionButton.extended(
+          heroTag: label,
+          onPressed: onPressed,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          icon: Icon(icon, color: Colors.white),
+          label: Text(label,
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w600)),
+        ),
+      );
+    }
+    return FloatingActionButton.extended(
+      heroTag: label,
+      onPressed: onPressed,
+      backgroundColor: Colors.white,
+      elevation: 2,
+      icon: Icon(icon, color: AppColors.primary),
+      label: Text(label,
+          style: const TextStyle(
+              color: AppColors.primary, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+// ─── Fuel Section ─────────────────────────────────────────────────────────────
+
+class _FuelSection extends StatelessWidget {
+  final List<FuelRecord> fuelRecords;
+  final Vehicle vehicle;
+  final void Function(FuelRecord) onEdit;
+  final void Function(FuelRecord) onDelete;
+
+  const _FuelSection({
+    required this.fuelRecords,
+    required this.vehicle,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  /// Hitung rata-rata konsumsi (km/liter) dari selisih odometer antar isian
+  double? _avgEfficiency() {
+    final withKm = fuelRecords
+        .where((r) => r.km != null)
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+    if (withKm.length < 2) return null;
+
+    double totalEff = 0;
+    int count = 0;
+    for (int i = 1; i < withKm.length; i++) {
+      final kmDiff = withKm[i].km! - withKm[i - 1].km!;
+      if (kmDiff > 0) {
+        totalEff += kmDiff / withKm[i].liters;
+        count++;
+      }
+    }
+    return count > 0 ? totalEff / count : null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final totalBbmCost =
+        fuelRecords.fold(0, (s, r) => s + r.totalCost);
+    final totalLiters =
+        fuelRecords.fold(0.0, (s, r) => s + r.liters);
+    final avgEff = _avgEfficiency();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (fuelRecords.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1B6B3A),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1B6B3A), Color(0xFF2E9E58)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: AppShadows.button,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Ringkasan BBM',
+                    style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _StatItem(
+                        label: 'Total Isi',
+                        value: '${fuelRecords.length}x'),
+                    _StatItem(
+                        label: 'Total Liter',
+                        value:
+                            '${totalLiters.toStringAsFixed(1)} L'),
+                    _StatItem(
+                        label: 'Total Biaya',
+                        value: formatCurrency(totalBbmCost)),
+                  ],
+                ),
+                if (avgEff != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                      height: 1,
+                      color: Colors.white.withValues(alpha: 0.15)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _StatItem(
+                        label: 'Rata-rata Konsumsi',
+                        value: '${avgEff.toStringAsFixed(1)} km/L',
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (fuelRecords.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            alignment: Alignment.center,
+            child: const Text(
+              'Belum ada catatan BBM',
+              style: TextStyle(
+                  color: AppColors.textHint, fontSize: 13),
+            ),
+          )
+        else
+          ...fuelRecords.map((r) => _FuelTile(
+                record: r,
+                onEdit: () => onEdit(r),
+                onDelete: () => onDelete(r),
+              )),
+      ],
+    );
+  }
+}
+
+class _FuelTile extends StatelessWidget {
+  final FuelRecord record;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _FuelTile({
+    required this.record,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: AppShadows.card,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFF2E9E58).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Center(
+              child: Text('⛽', style: TextStyle(fontSize: 20)),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      record.fuelType ?? 'BBM',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${record.liters.toStringAsFixed(1)} L',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  formatDate(record.date),
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
+                ),
+                if (record.km != null)
+                  Text(
+                    formatKm(record.km!),
+                    style: const TextStyle(
+                        fontSize: 11, color: AppColors.textHint),
+                  ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                formatCurrency(record.totalCost),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: onEdit,
+                    child: const Text('Edit',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.accent,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: onDelete,
+                    child: const Text('Hapus',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.danger,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

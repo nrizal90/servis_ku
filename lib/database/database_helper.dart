@@ -2,6 +2,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:servisku/models/vehicle.dart';
 import 'package:servisku/models/service_record.dart';
+import 'package:servisku/models/fuel_record.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -21,7 +22,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
       onOpen: (db) async {
@@ -71,6 +72,32 @@ class DatabaseHelper {
     await db.execute(
       'CREATE INDEX idx_vehicles_type ON vehicles(vehicle_type)',
     );
+
+    await _createFuelTable(db);
+  }
+
+  Future<void> _createFuelTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE fuel_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vehicle_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        km INTEGER,
+        liters REAL NOT NULL,
+        price_per_liter INTEGER,
+        total_cost INTEGER NOT NULL,
+        fuel_type TEXT,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX idx_fuel_records_vehicle_id ON fuel_records(vehicle_id)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_fuel_records_date ON fuel_records(date DESC)',
+    );
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -81,6 +108,7 @@ class DatabaseHelper {
       } catch (_) {
         // Kolom sudah ada dari phase 1
       }
+      await _createFuelTable(db);
     }
   }
 
@@ -198,6 +226,42 @@ class DatabaseHelper {
   Future<void> deleteServiceRecord(int id) async {
     final db = await database;
     await db.delete('service_records', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ─── FuelRecord CRUD ───────────────────────────────────────────────────────
+
+  Future<FuelRecord> insertFuelRecord(FuelRecord record) async {
+    final db = await database;
+    final now = DateTime.now();
+    final map = record.copyWith(createdAt: now).toMap();
+    final id = await db.insert('fuel_records', map);
+    return record.copyWith(id: id, createdAt: now);
+  }
+
+  Future<List<FuelRecord>> getFuelRecordsByVehicle(int vehicleId) async {
+    final db = await database;
+    final rows = await db.query(
+      'fuel_records',
+      where: 'vehicle_id = ?',
+      whereArgs: [vehicleId],
+      orderBy: 'date DESC',
+    );
+    return rows.map(FuelRecord.fromMap).toList();
+  }
+
+  Future<void> updateFuelRecord(FuelRecord record) async {
+    final db = await database;
+    await db.update(
+      'fuel_records',
+      record.toMap(),
+      where: 'id = ?',
+      whereArgs: [record.id],
+    );
+  }
+
+  Future<void> deleteFuelRecord(int id) async {
+    final db = await database;
+    await db.delete('fuel_records', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> close() async {
