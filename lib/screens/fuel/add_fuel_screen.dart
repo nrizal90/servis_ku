@@ -12,7 +12,7 @@ import 'package:servisku/widgets/app_button.dart';
 import 'package:servisku/widgets/app_input.dart';
 import 'package:servisku/widgets/toast.dart';
 
-const _fuelTypes = ['Pertalite', 'Pertamax', 'Pertamax Turbo', 'Solar', 'Dex'];
+const _fuelTypes = ['Pertalite', 'Pertamax Green 92', 'Pertamax', 'Pertamax Turbo', 'Solar', 'Dexlite', 'Pertamina Dex', 'Shell Super', 'Shell V-Power', 'Shell V-Power Nitro+', 'Shell V-Power Diesel', 'Total Performance 92', 'Total Performance 95', 'Revvo 89', 'Revvo 92', 'Revvo 95', 'BP 90', 'BP 95', 'BP Diesel', 'Lainnya...'];
 
 class AddFuelScreen extends ConsumerStatefulWidget {
   final int vehicleId;

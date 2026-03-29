@@ -12,5 +12,9 @@
 # Notifications
 -keep class com.dexterous.** { *; }
 
+# Gson TypeToken - required by flutter_local_notifications to load scheduled notifications
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep class * extends com.google.gson.reflect.TypeToken
+
 # Timezone
 -keep class org.joda.** { *; }
