@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:servisku/config/theme.dart';
 import 'package:servisku/models/service_record.dart';
 import 'package:servisku/models/service_type.dart';
 import 'package:servisku/models/vehicle.dart';
+import 'package:servisku/providers/km_stats_provider.dart';
 import 'package:servisku/utils/service_calculator.dart';
 
-class ServiceStatusGrid extends StatelessWidget {
+class ServiceStatusGrid extends ConsumerWidget {
   final Vehicle vehicle;
   final List<ServiceRecord> records;
 
@@ -16,8 +18,9 @@ class ServiceStatusGrid extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final types = getServiceTypesFor(vehicle.vehicleType);
+    final currentKm = ref.watch(kmStatsProvider(vehicle.id!)).valueOrNull?.currentKm;
 
     return GridView.builder(
       shrinkWrap: true,
@@ -39,7 +42,7 @@ class ServiceStatusGrid extends StatelessWidget {
         } catch (_) {
           last = null;
         }
-        final status = ServiceCalculator.getStatus(last, st);
+        final status = ServiceCalculator.getStatus(last, st, currentKm: currentKm);
         return _ServiceCell(serviceType: st, status: status);
       },
     );

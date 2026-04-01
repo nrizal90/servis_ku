@@ -8,6 +8,7 @@ import 'package:servisku/models/service_record.dart';
 import 'package:servisku/models/service_type.dart';
 import 'package:servisku/models/vehicle.dart';
 import 'package:servisku/providers/fuel_record_provider.dart';
+import 'package:servisku/providers/km_stats_provider.dart';
 import 'package:servisku/providers/service_record_provider.dart';
 import 'package:servisku/providers/vehicle_provider.dart';
 import 'package:servisku/screens/vehicle/widgets/history_list.dart';
@@ -112,7 +113,7 @@ class _DetailViewState extends ConsumerState<_DetailView> {
                           _AdminSection(vehicle: vehicle, ref: ref),
                           const SizedBox(height: 16),
                           if (records.isNotEmpty) ...[
-                            _StatsSection(records: records),
+                            _StatsSection(records: records, vehicleId: vehicle.id!),
                             const SizedBox(height: 20),
                           ],
                           const Text(
@@ -249,19 +250,17 @@ class _DetailViewState extends ConsumerState<_DetailView> {
 
 // ─── Stats Section ────────────────────────────────────────────────────────────
 
-class _StatsSection extends StatelessWidget {
+class _StatsSection extends ConsumerWidget {
   final List<ServiceRecord> records;
+  final int vehicleId;
 
-  const _StatsSection({required this.records});
+  const _StatsSection({required this.records, required this.vehicleId});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final totalCost = records.fold(0, (s, r) => s + (r.cost ?? 0));
     final lastRecord = records.isNotEmpty ? records.first : null;
-    final lastKm = records
-        .where((r) => r.km != null)
-        .fold<int?>(null,
-            (prev, r) => (prev == null || r.km! > prev) ? r.km : prev);
+    final kmStats = ref.watch(kmStatsProvider(vehicleId)).valueOrNull;
 
     int avgPerMonth = 0;
     if (records.length > 1) {
@@ -298,9 +297,7 @@ class _StatsSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Container(
-              height: 1,
-              color: Colors.white.withValues(alpha: 0.15)),
+          Container(height: 1, color: Colors.white.withValues(alpha: 0.15)),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -309,8 +306,14 @@ class _StatsSection extends StatelessWidget {
                 value: lastRecord != null ? formatDate(lastRecord.date) : '-',
               ),
               _StatItem(
-                label: 'Km Terakhir',
-                value: lastKm != null ? formatKm(lastKm) : '-',
+                label: 'KM Sekarang',
+                value: kmStats != null ? formatKm(kmStats.currentKm) : '-',
+              ),
+              _StatItem(
+                label: 'Rata-rata/hari',
+                value: kmStats?.avgDailyKm != null
+                    ? '${kmStats!.avgDailyKm!.toStringAsFixed(1)} km'
+                    : '-',
               ),
             ],
           ),

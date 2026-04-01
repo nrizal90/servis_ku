@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:servisku/models/vehicle.dart';
 import 'package:servisku/models/service_record.dart';
 import 'package:servisku/models/fuel_record.dart';
+import 'package:servisku/utils/service_calculator.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -262,6 +263,34 @@ class DatabaseHelper {
   Future<void> deleteFuelRecord(int id) async {
     final db = await database;
     await db.delete('fuel_records', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ─── KM History ───────────────────────────────────────────────────────────
+
+  Future<List<KmPoint>> getKmHistory(int vehicleId) async {
+    final db = await database;
+
+    final serviceRows = await db.query(
+      'service_records',
+      columns: ['date', 'km'],
+      where: 'vehicle_id = ? AND km IS NOT NULL',
+      whereArgs: [vehicleId],
+    );
+
+    final fuelRows = await db.query(
+      'fuel_records',
+      columns: ['date', 'km'],
+      where: 'vehicle_id = ? AND km IS NOT NULL',
+      whereArgs: [vehicleId],
+    );
+
+    return [...serviceRows, ...fuelRows]
+        .map((r) => KmPoint(
+              date: DateTime.parse(r['date'] as String),
+              km: r['km'] as int,
+            ))
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
   }
 
   Future<void> close() async {

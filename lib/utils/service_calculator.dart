@@ -2,6 +2,19 @@ import 'package:servisku/models/service_record.dart';
 import 'package:servisku/models/service_type.dart';
 import 'package:servisku/models/vehicle.dart';
 
+class KmPoint {
+  final DateTime date;
+  final int km;
+  const KmPoint({required this.date, required this.km});
+}
+
+class KmStats {
+  final int currentKm;
+  final double? avgDailyKm;
+
+  const KmStats({required this.currentKm, this.avgDailyKm});
+}
+
 class ServiceStatus {
   final String status; // 'ok' | 'soon' | 'overdue' | 'unknown'
   final int? daysLeft;
@@ -36,7 +49,10 @@ class UpcomingAlert {
 
 class ServiceCalculator {
   static ServiceStatus getStatus(
-      ServiceRecord? lastRecord, ServiceType type) {
+    ServiceRecord? lastRecord,
+    ServiceType type, {
+    int? currentKm,
+  }) {
     if (lastRecord == null) return ServiceStatus.unknown;
 
     final now = DateTime.now();
@@ -55,11 +71,33 @@ class ServiceCalculator {
       }
     }
 
-    if (type.intervalKm != null && lastRecord.km != null) {
-      kmLeft = type.intervalKm! - (lastRecord.km! - lastRecord.km!);
+    if (type.intervalKm != null && lastRecord.km != null && currentKm != null) {
+      final kmSince = currentKm - lastRecord.km!;
+      kmLeft = type.intervalKm! - kmSince;
+      if (kmLeft < 0) {
+        status = 'overdue';
+      } else if (kmLeft <= 500 && status != 'overdue') {
+        status = 'soon';
+      }
     }
 
     return ServiceStatus(status: status, daysLeft: daysLeft, kmLeft: kmLeft);
+  }
+
+  static KmStats? calculateKmStats(List<KmPoint> points) {
+    if (points.isEmpty) return null;
+    final sorted = [...points]..sort((a, b) => a.date.compareTo(b.date));
+    final currentKm = sorted.last.km;
+
+    double? avgDailyKm;
+    if (sorted.length >= 2) {
+      final days = sorted.last.date.difference(sorted.first.date).inDays;
+      if (days > 0) {
+        avgDailyKm = (sorted.last.km - sorted.first.km) / days;
+      }
+    }
+
+    return KmStats(currentKm: currentKm, avgDailyKm: avgDailyKm);
   }
 
   static ServiceStatus getStnkStatus(DateTime? stnkDueDate) {
