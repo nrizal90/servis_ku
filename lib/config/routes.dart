@@ -5,6 +5,8 @@ import 'package:servisku/models/vehicle.dart';
 import 'package:servisku/screens/home/home_screen.dart';
 import 'package:servisku/screens/vehicle/add_vehicle_screen.dart';
 import 'package:servisku/screens/vehicle/vehicle_detail_screen.dart';
+import 'package:servisku/screens/vehicle/service_history_screen.dart';
+import 'package:servisku/screens/vehicle/fuel_history_screen.dart';
 import 'package:servisku/screens/service/add_service_screen.dart';
 import 'package:servisku/screens/fuel/add_fuel_screen.dart';
 import 'package:servisku/services/notification_service.dart';
@@ -65,6 +67,16 @@ final appRouter = GoRouter(
           existingRecord: state.extra as FuelRecord,
         );
       },
+    ),
+    GoRoute(
+      path: '/vehicle/:id/service/history',
+      builder: (context, state) =>
+          ServiceHistoryScreen(vehicle: state.extra as Vehicle),
+    ),
+    GoRoute(
+      path: '/vehicle/:id/fuel/history',
+      builder: (context, state) =>
+          FuelHistoryScreen(vehicle: state.extra as Vehicle),
     ),
   ],
 );

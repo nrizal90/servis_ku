@@ -125,6 +125,7 @@ class _AddFuelScreenState extends ConsumerState<AddFuelScreen> {
               _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
         );
         await ref.read(fuelRecordProvider.notifier).updateRecord(updated);
+        ref.invalidate(fuelRecordsByVehicleProvider(widget.vehicleId));
       } else {
         final record = FuelRecord(
           vehicleId: widget.vehicleId,
@@ -140,6 +141,7 @@ class _AddFuelScreenState extends ConsumerState<AddFuelScreen> {
           createdAt: DateTime.now(),
         );
         await ref.read(fuelRecordProvider.notifier).addRecord(record);
+        ref.invalidate(fuelRecordsByVehicleProvider(widget.vehicleId));
       }
 
       if (mounted) {

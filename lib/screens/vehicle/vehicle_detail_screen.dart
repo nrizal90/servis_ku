@@ -139,18 +139,40 @@ class _DetailViewState extends ConsumerState<_DetailView> {
                                   color: AppColors.textPrimary,
                                 ),
                               ),
-                              if (records.isNotEmpty)
-                                _FilterDropdown(
-                                  vehicleType: vehicle.vehicleType,
-                                  selectedId: _filterTypeId,
-                                  onChanged: (id) =>
-                                      setState(() => _filterTypeId = id),
-                                ),
+                              Row(
+                                children: [
+                                  if (filtered.length > 5)
+                                    GestureDetector(
+                                      onTap: () => context.push(
+                                        '/vehicle/${vehicle.id}/service/history',
+                                        extra: vehicle,
+                                      ),
+                                      child: const Text(
+                                        'Lihat semua',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.accent,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  if (records.isNotEmpty) ...[
+                                    if (filtered.length > 5)
+                                      const SizedBox(width: 12),
+                                    _FilterDropdown(
+                                      vehicleType: vehicle.vehicleType,
+                                      selectedId: _filterTypeId,
+                                      onChanged: (id) =>
+                                          setState(() => _filterTypeId = id),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ],
                           ),
                           const SizedBox(height: 8),
                           HistoryList(
-                            records: filtered,
+                            records: filtered.take(5).toList(),
                             onEdit: (r) => context.push(
                               '/vehicle/${vehicle.id}/service/edit',
                               extra: r,
@@ -190,6 +212,12 @@ class _DetailViewState extends ConsumerState<_DetailView> {
                             data: (fuelRecords) => _FuelSection(
                               fuelRecords: fuelRecords,
                               vehicle: vehicle,
+                              onSeeAll: fuelRecords.length > 5
+                                  ? () => context.push(
+                                        '/vehicle/${vehicle.id}/fuel/history',
+                                        extra: vehicle,
+                                      )
+                                  : null,
                               onEdit: (r) => context.push(
                                 '/vehicle/${vehicle.id}/fuel/edit',
                                 extra: r,
@@ -213,7 +241,7 @@ class _DetailViewState extends ConsumerState<_DetailView> {
                               },
                             ),
                           ),
-                          const SizedBox(height: 100),
+                          const SizedBox(height: 160),
                         ],
                       ),
                     ),
@@ -614,12 +642,14 @@ class _FabButton extends StatelessWidget {
 class _FuelSection extends StatelessWidget {
   final List<FuelRecord> fuelRecords;
   final Vehicle vehicle;
+  final VoidCallback? onSeeAll;
   final void Function(FuelRecord) onEdit;
   final void Function(FuelRecord) onDelete;
 
   const _FuelSection({
     required this.fuelRecords,
     required this.vehicle,
+    this.onSeeAll,
     required this.onEdit,
     required this.onDelete,
   });
@@ -721,12 +751,30 @@ class _FuelSection extends StatelessWidget {
                   color: AppColors.textHint, fontSize: 13),
             ),
           )
-        else
-          ...fuelRecords.map((r) => _FuelTile(
+        else ...[
+          ...fuelRecords.take(5).map((r) => _FuelTile(
                 record: r,
                 onEdit: () => onEdit(r),
                 onDelete: () => onDelete(r),
               )),
+          if (onSeeAll != null)
+            GestureDetector(
+              onTap: onSeeAll,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Center(
+                  child: Text(
+                    'Lihat semua riwayat BBM →',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.accent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ],
     );
   }
